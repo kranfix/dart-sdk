@@ -152,7 +152,7 @@ base class LinkedList<E extends LinkedListEntry<E>> extends Iterable<E> {
     if (isEmpty) {
       throw StateError('No such element');
     }
-    return _first!._previous!;
+    return _first!._previous!.target!;
   }
 
   E get single {
@@ -194,20 +194,21 @@ base class LinkedList<E extends LinkedListEntry<E>> extends Iterable<E> {
     }
     _modificationCount++;
 
-    newEntry._list = this;
+    newEntry._list = WeakReference(this);
     if (isEmpty) {
       assert(entry == null);
-      newEntry._previous = newEntry._next = newEntry;
+      final previous = newEntry._next = newEntry;
+      newEntry._previous = WeakReference(previous);
       _first = newEntry;
       _length++;
       return;
     }
-    E predecessor = entry!._previous!;
+    E predecessor = entry!._previous!.target!;
     E successor = entry;
-    newEntry._previous = predecessor;
+    newEntry._previous = WeakReference(predecessor);
     newEntry._next = successor;
     predecessor._next = newEntry;
-    successor._previous = newEntry;
+    successor._previous = WeakReference(newEntry);
     if (updateFirst && identical(entry, _first)) {
       _first = newEntry;
     }
@@ -217,7 +218,7 @@ base class LinkedList<E extends LinkedListEntry<E>> extends Iterable<E> {
   void _unlink(E entry) {
     _modificationCount++;
     entry._next!._previous = entry._previous;
-    E? next = entry._previous!._next = entry._next;
+    E? next = entry._previous!.target!._next = entry._next;
     _length--;
     entry._list = entry._next = entry._previous = null;
     if (isEmpty) {
@@ -271,20 +272,20 @@ class _LinkedListIterator<E extends LinkedListEntry<E>> implements Iterator<E> {
 ///
 /// When created, an entry is not in any linked list.
 abstract base mixin class LinkedListEntry<E extends LinkedListEntry<E>> {
-  LinkedList<E>? _list;
+  WeakReference<LinkedList<E>>? _list;
   E? _next;
-  E? _previous;
+  WeakReference<E>? _previous;
 
   /// The linked list containing this element.
   ///
   /// The value is `null` if this entry is not currently in any list.
-  LinkedList<E>? get list => _list;
+  LinkedList<E>? get list => _list?.target;
 
   /// Unlink the element from its linked list.
   ///
   /// The entry must currently be in a linked list when this method is called.
   void unlink() {
-    _list!._unlink(this as E);
+    _list?.target?._unlink(this as E);
   }
 
   /// The successor of this element in its linked list.
@@ -292,7 +293,8 @@ abstract base mixin class LinkedListEntry<E extends LinkedListEntry<E>> {
   /// The value is `null` if there is no successor in the linked list,
   /// or if this entry is not currently in any list.
   E? get next {
-    if (_list == null || identical(_list!.first, _next)) return null;
+    if (_list?.target == null || identical(_list!.target!.first, _next))
+      return null;
     return _next;
   }
 
@@ -301,8 +303,9 @@ abstract base mixin class LinkedListEntry<E extends LinkedListEntry<E>> {
   /// The value is `null` if there is no predecessor in the linked list,
   /// or if this entry is not currently in any list.
   E? get previous {
-    if (_list == null || identical(this, _list!.first)) return null;
-    return _previous;
+    final list = _list?.target;
+    if (list == null || identical(this, list.first)) return null;
+    return _previous?.target;
   }
 
   /// Insert an element after this element in this element's linked list.
@@ -310,7 +313,7 @@ abstract base mixin class LinkedListEntry<E extends LinkedListEntry<E>> {
   /// This entry must be in a linked list when this method is called.
   /// The [entry] must not be in a linked list.
   void insertAfter(E entry) {
-    _list!._insertBefore(_next, entry, updateFirst: false);
+    _list!.target!._insertBefore(_next, entry, updateFirst: false);
   }
 
   /// Insert an element before this element in this element's linked list.
@@ -318,6 +321,6 @@ abstract base mixin class LinkedListEntry<E extends LinkedListEntry<E>> {
   /// This entry must be in a linked list when this method is called.
   /// The [entry] must not be in a linked list.
   void insertBefore(E entry) {
-    _list!._insertBefore(this as E, entry, updateFirst: true);
+    _list!.target!._insertBefore(this as E, entry, updateFirst: true);
   }
 }
